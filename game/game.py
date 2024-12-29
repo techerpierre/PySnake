@@ -16,23 +16,23 @@ class Game:
         self.snake = Snake()
         self.collectable = Collectable()
         self.score = 0
-        self.font = pygame.font.Font(None, 36)
+        self.font = pygame.font.Font(None, 24)
 
     def Run(self):
         while self.running:
-            self.screen.fill(config.COLOR_GREEN)
-            pygame.draw.rect(self.screen, config.COLOR_DARK_GREEN, pygame.Rect(config.SCREEN_WIDTH, 0, 200, config.SCREEN_HEIGHT))
+            self.screen.fill(config.COLOR_CELL_DARK)
             self.Event(pygame.event.get())
+            self.draw_background()
             self.collectable.Draw(self.screen)
             self.snake.Draw(self.screen)
             self.snake.Move()
-            self.screen.blit(self.Create_scorring(), (config.SCREEN_WIDTH + 10, 10))
+            self.screen.blit(self.create_scorring(), (config.SCREEN_WIDTH + 10, 10))
 
             collision = self.snake.Get_body_collision()
             if collision:
                 self.running = False
                 print("Votre score est de " + str(self.score) + " points.")
-            
+
             collision = self.snake.Get_collectable_collision(self.collectable.coordinate)
             if collision:
                 self.collectable.New_coordinate(self.snake.coordinate)
@@ -45,17 +45,26 @@ class Game:
                 print("Votre score est de " + str(self.score) + " points.")
 
             pygame.display.flip()
-            self.clock.tick(5)
+            self.clock.tick(config.TICK_SPEED)
+
+    def draw_background(self):
+        for y in range(config.CELL_Y):
+            for x in range(config.CELL_X):
+                color = config.COLOR_CELL_DARK if (y % 2 == 0 and not x % 2 == 0) or (not y % 2 == 0 and x % 2 == 0) else config.COLOR_CELL_LIGHT
+                rect = pygame.Rect(x * config.CELL_SIZE, y * config.CELL_SIZE, config.CELL_SIZE, config.CELL_SIZE)
+                pygame.draw.rect(self.screen, color, rect)
 
     def Event(self, events):
         global speed
+        already_keydown = False
         for event in events:
                 if event.type == pygame.QUIT:
                     print("Votre score est de " + str(self.score) + " points.")
                     self.running == False
                     pygame.quit()
                     sys.exit()
-                if event.type == pygame.KEYDOWN:
+                if event.type == pygame.KEYDOWN and not already_keydown:
+                    already_keydown = True
                     if event.key == pygame.K_d and speed != [-1, 0]:
                         speed = [1, 0]
                     if event.key == pygame.K_q and speed != [1, 0]:
@@ -65,13 +74,14 @@ class Game:
                     if event.key == pygame.K_s and speed != [0, -1]:
                         speed = [0, 1]
 
-    def Create_scorring(self):
+    def create_scorring(self):
         text = "score: " + str(self.score)
         return self.font.render(text, True, config.COLOR_WHITE)
 
 class Snake:
     def __init__(self):
         self.head = (config.CELL_X // 2, config.CELL_Y // 2 + 1)
+        self.gradient = Gradient(config.COLOR_SNAKE_FIRST, config.COLOR_SNAKE_LAST)
         self.coordinate = [
             (self.head[0], self.head[1]),
             (self.head[0], self.head[1] + 1),
@@ -81,12 +91,11 @@ class Snake:
 
     def Draw(self, screen):
         global speed
-        for coordinate in self.coordinate:
-            if self.coordinate.index(coordinate) % 2 == 0:
-                color = config.COLOR_BLUE
-            else:
-                color = config.COLOR_LIGHT_BLUE
-            rect = pygame.Rect(coordinate[0] * config.CELL_SIZE, coordinate[1] * config.CELL_SIZE, config.CELL_SIZE, config.CELL_SIZE)
+        for index, coordinate in enumerate(self.coordinate):
+            pos_offset = config.CELL_DRAW_OFFSET // 2
+            offset = config.CELL_DRAW_OFFSET
+            color = self.gradient.get_color(index, len(self.coordinate))
+            rect = pygame.Rect(coordinate[0] * config.CELL_SIZE + pos_offset, coordinate[1] * config.CELL_SIZE + pos_offset, config.CELL_SIZE - offset, config.CELL_SIZE - offset)
             pygame.draw.rect(screen, color, rect)
 
     def Move(self):
@@ -114,13 +123,13 @@ class Snake:
             return True
         else:
             return False
-    
+
     def Get_collectable_collision(self, collectable):
         if self.head == collectable:
             return True
         else: 
             return False
-        
+
     def Get_wall_collision(self):
         if self.head[0] < 0 or self.head[0] > config.CELL_X - 1:
             return True
@@ -138,7 +147,26 @@ class Collectable:
             self.coordinate = (randint(0, config.CELL_X - 1), randint(0, config.CELL_Y -1))
 
     def Draw(self, screen):
+        pos_offset = config.CELL_DRAW_OFFSET // 2
+        offset = config.CELL_DRAW_OFFSET
         stick = pygame.Rect(self.coordinate[0] * config.CELL_SIZE + 9, self.coordinate[1] * config.CELL_SIZE - 8, 2, 8)
-        rect = pygame.Rect(self.coordinate[0] * config.CELL_SIZE, self.coordinate[1] * config.CELL_SIZE, config.CELL_SIZE, config.CELL_SIZE)
+        rect = pygame.Rect(self.coordinate[0] * config.CELL_SIZE + pos_offset, self.coordinate[1] * config.CELL_SIZE + pos_offset, config.CELL_SIZE - offset, config.CELL_SIZE - offset)
         pygame.draw.rect(screen, config.COLOR_RED, rect)
         pygame.draw.rect(screen, config.COLOR_BROWN, stick)
+
+class Gradient:
+    def __init__(self, first_color, last_color):
+        self.first_color = first_color
+        self.last_color = last_color
+
+    def get_color(self, index, length):
+
+        r_diff = config.COLOR_SNAKE_LAST[0] - config.COLOR_SNAKE_FIRST[0]
+        g_diff = config.COLOR_SNAKE_LAST[1] - config.COLOR_SNAKE_FIRST[1]
+        b_diff = config.COLOR_SNAKE_LAST[2] - config.COLOR_SNAKE_FIRST[2]
+
+        r = config.COLOR_SNAKE_FIRST[0] + (r_diff * (index / (length - 1)))
+        g = config.COLOR_SNAKE_FIRST[1] + (g_diff * (index / (length - 1)))
+        b = config.COLOR_SNAKE_FIRST[2] + (b_diff * (index / (length - 1)))
+
+        return (int(r), int(g), int(b))
